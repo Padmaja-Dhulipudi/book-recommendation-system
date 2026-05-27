@@ -1,8 +1,3 @@
-# 📚 Bookish Aesthetic Frontend (Streamlit)
-
-Replace your current `app.py` with this complete frontend-focused version.
-
-```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -289,83 +284,8 @@ st.markdown('</div>', unsafe_allow_html=True)
 st.markdown("""
 <br><br>
 <center>
-<p style='color:#7a6758;'>Made with 🤎 for book lovers</p>
+<p style='color:#7a6758;'>Made with 🤎 for book lovers by a book lover</p>
 </center>
 """, unsafe_allow_html=True)
 ```
 
----
-
-# 📁 Required Files
-
-```text
-book-recommendation-system/
-│
-├── app.py
-├── books.csv
-├── requirements.txt
-├── runtime.txt
-└── README.md
-```
-
----
-
-# requirements.txt
-
-```txt
-streamlit==1.32.0
-pandas==2.1.1
-numpy==1.26.4
-scikit-learn==1.3.2
-```
-
----
-
-# runtime.txt
-
-```txt
-python-3.12
-```
-
----
-
-# README.md
-
-````md
-# 📚 The Book Nook
-
-A cozy, aesthetic, Netflix-inspired book recommendation web app built using Streamlit.
-
-## ✨ Features
-
-- Beautiful bookish aesthetic UI
-- Personalized recommendations
-- Trending shelf section
-- Hover animations
-- Fast recommendation engine using cosine similarity
-
-## 🛠 Tech Stack
-
-- Python
-- Streamlit
-- Pandas
-- NumPy
-- Scikit-learn
-
-## 🚀 Run Locally
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-````
-
-## 🌐 Deploy
-
-Deploy easily using Streamlit Cloud.
-
-## 🤎 Designed For
-
-Readers, students, and book lovers who enjoy discovering their next favorite read.
-
-```
-```
