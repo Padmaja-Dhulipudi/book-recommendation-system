@@ -3,18 +3,13 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ---------------------------------
-# PAGE CONFIG
-# ---------------------------------
+
 st.set_page_config(
     page_title="The Book Nook",
     page_icon="📚",
     layout="wide"
 )
 
-# ---------------------------------
-# AESTHETIC CSS
-# ---------------------------------
 st.markdown("""
 <style>
 
