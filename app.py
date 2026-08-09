@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import ast
 import re
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -17,113 +16,6 @@ st.set_page_config(
     page_icon="📚",
     layout="wide"
 )
-
-
-# ==========================================
-# CUSTOM CSS
-# ==========================================
-
-st.markdown("""
-<style>
-
-.main {
-    background-color: #faf8f4;
-}
-
-.hero {
-    padding: 45px 20px 30px 20px;
-    text-align: center;
-}
-
-.hero-title {
-    font-size: 52px;
-    font-weight: 800;
-}
-
-.hero-subtitle {
-    font-size: 19px;
-    color: #666;
-    margin-top: 8px;
-}
-
-.section-title {
-    font-size: 28px;
-    font-weight: 700;
-    margin-top: 35px;
-    margin-bottom: 20px;
-}
-
-.book-card {
-    background: white;
-    padding: 15px;
-    border-radius: 16px;
-    margin-bottom: 20px;
-    box-shadow: 0px 4px 16px rgba(0,0,0,0.08);
-    min-height: 390px;
-}
-
-.book-card img {
-    width: 100%;
-    height: 240px;
-    object-fit: contain;
-    border-radius: 10px;
-}
-
-.book-title {
-    font-size: 17px;
-    font-weight: 700;
-    margin-top: 12px;
-}
-
-.book-author {
-    font-size: 14px;
-    color: #666;
-    margin-top: 5px;
-}
-
-.book-rating {
-    font-size: 14px;
-    margin-top: 8px;
-}
-
-.book-score {
-    font-size: 13px;
-    color: #777;
-    margin-top: 5px;
-}
-
-.feature-card {
-    background: white;
-    padding: 25px;
-    border-radius: 16px;
-    min-height: 160px;
-    text-align: center;
-    box-shadow: 0px 4px 15px rgba(0,0,0,0.06);
-}
-
-.feature-icon {
-    font-size: 35px;
-}
-
-.feature-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin-top: 10px;
-}
-
-.feature-text {
-    color: #777;
-    font-size: 14px;
-}
-
-.footer {
-    text-align: center;
-    color: #888;
-    padding: 40px 0 20px 0;
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 
 # ==========================================
@@ -147,9 +39,14 @@ def load_data():
 
     df = df.drop_duplicates(subset=["title"])
 
+    df["title"] = df["title"].astype(str)
     df["authors"] = df["authors"].astype(str)
 
-    df["title"] = df["title"].astype(str)
+    df["original_title"] = (
+        df["original_title"]
+        .fillna("")
+        .astype(str)
+    )
 
     df["average_rating"] = pd.to_numeric(
         df["average_rating"],
@@ -172,40 +69,32 @@ data = load_data()
 
 
 # ==========================================
-# CREATE FEATURES
+# BUILD TF-IDF MODEL
 # ==========================================
 
 @st.cache_resource
 def build_model(df):
 
-    df = df.copy()
-
-    df["features"] = (
+    features = (
         df["title"] + " " +
         df["authors"] + " " +
-        df["original_title"].fillna("").astype(str)
+        df["original_title"]
     )
 
     vectorizer = TfidfVectorizer(
         stop_words="english"
     )
 
-    tfidf_matrix = vectorizer.fit_transform(
-        df["features"]
-    )
+    tfidf_matrix = vectorizer.fit_transform(features)
 
-    similarity_matrix = cosine_similarity(
-        tfidf_matrix
-    )
-
-    return similarity_matrix
+    return vectorizer, tfidf_matrix
 
 
-similarity_matrix = build_model(data)
+vectorizer, tfidf_matrix = build_model(data)
 
 
 # ==========================================
-# IMAGE URL CLEANER
+# IMAGE URL
 # ==========================================
 
 def get_image_url(value):
@@ -239,17 +128,25 @@ def recommend(book_title, number_of_books=8):
     if not matches:
         return pd.DataFrame()
 
-    index = matches[0]
+    book_index = matches[0]
 
-    similarity_scores = similarity_matrix[index]
+    selected_vector = tfidf_matrix[
+        book_index
+    ]
 
-    similar_indices = (
-        np.argsort(similarity_scores)[::-1]
-    )
+    scores = cosine_similarity(
+        selected_vector,
+        tfidf_matrix
+    ).flatten()
+
+    similar_indices = np.argsort(
+        scores
+    )[::-1]
 
     similar_indices = [
-        i for i in similar_indices
-        if i != index
+        index
+        for index in similar_indices
+        if index != book_index
     ][:number_of_books]
 
     recommendations = data.iloc[
@@ -257,40 +154,32 @@ def recommend(book_title, number_of_books=8):
     ].copy()
 
     recommendations["similarity"] = [
-        similarity_scores[i] * 100
-        for i in similar_indices
+        scores[index] * 100
+        for index in similar_indices
     ]
 
     return recommendations
 
 
 # ==========================================
-# HERO
+# HEADER
 # ==========================================
 
-st.markdown("""
-<div class="hero">
+st.title("📚 The Book Nook")
 
-    <div class="hero-title">
-        📚 The Book Nook
-    </div>
+st.write(
+    "Discover your next favorite book with "
+    "AI-powered recommendations."
+)
 
-    <div class="hero-subtitle">
-        Discover your next favorite book with AI-powered recommendations.
-    </div>
-
-</div>
-""", unsafe_allow_html=True)
+st.divider()
 
 
 # ==========================================
 # SEARCH
 # ==========================================
 
-st.markdown(
-    '<div class="section-title">🔎 Find Your Next Read</div>',
-    unsafe_allow_html=True
-)
+st.header("🔎 Find Your Next Read")
 
 book_list = sorted(
     data["title"].tolist()
@@ -303,7 +192,7 @@ selected_book = st.selectbox(
 
 
 # ==========================================
-# RECOMMEND
+# RECOMMENDATIONS
 # ==========================================
 
 if st.button(
@@ -317,10 +206,7 @@ if st.button(
 
     if not recommendations.empty:
 
-        st.markdown(
-            '<div class="section-title">📖 You Might Also Like</div>',
-            unsafe_allow_html=True
-        )
+        st.header("📖 You Might Also Like")
 
         cols = st.columns(4)
 
@@ -328,43 +214,37 @@ if st.button(
             recommendations.iterrows()
         ):
 
-            image_url = get_image_url(
-                book["image_url"]
-            )
-
             with cols[i % 4]:
 
-                st.markdown(
-                    f"""
-                    <div class="book-card">
+                image_url = get_image_url(
+                    book["image_url"]
+                )
 
-                        <img
-                            src="{image_url}"
-                            onerror="this.style.display='none';"
-                        >
+                if image_url:
+                    st.image(
+                        image_url,
+                        use_container_width=True
+                    )
 
-                        <div class="book-title">
-                            {book["title"]}
-                        </div>
+                st.subheader(
+                    book["title"]
+                )
 
-                        <div class="book-author">
-                            ✍️ {book["authors"]}
-                        </div>
+                st.caption(
+                    f"✍️ {book['authors']}"
+                )
 
-                        <div class="book-rating">
-                            ⭐ {book["average_rating"]}
-                            &nbsp; • &nbsp;
-                            {int(book["ratings_count"]):,} ratings
-                        </div>
+                st.write(
+                    f"⭐ {book['average_rating']:.2f}"
+                )
 
-                        <div class="book-score">
-                            🤖 Similarity:
-                            {book["similarity"]:.1f}%
-                        </div>
+                st.caption(
+                    f"🤖 Similarity: "
+                    f"{book['similarity']:.1f}%"
+                )
 
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+                st.caption(
+                    f"📊 {int(book['ratings_count']):,} ratings"
                 )
 
 
@@ -372,10 +252,9 @@ if st.button(
 # POPULAR BOOKS
 # ==========================================
 
-st.markdown(
-    '<div class="section-title">🔥 Popular on the Shelf</div>',
-    unsafe_allow_html=True
-)
+st.divider()
+
+st.header("🔥 Popular on the Shelf")
 
 popular_books = data.sort_values(
     "ratings_count",
@@ -388,40 +267,32 @@ for i, (_, book) in enumerate(
     popular_books.iterrows()
 ):
 
-    image_url = get_image_url(
-        book["image_url"]
-    )
-
     with cols[i % 4]:
 
-        st.markdown(
-            f"""
-            <div class="book-card">
+        image_url = get_image_url(
+            book["image_url"]
+        )
 
-                <img
-                    src="{image_url}"
-                    onerror="this.style.display='none';"
-                >
+        if image_url:
+            st.image(
+                image_url,
+                use_container_width=True
+            )
 
-                <div class="book-title">
-                    {book["title"]}
-                </div>
+        st.subheader(
+            book["title"]
+        )
 
-                <div class="book-author">
-                    ✍️ {book["authors"]}
-                </div>
+        st.caption(
+            f"✍️ {book['authors']}"
+        )
 
-                <div class="book-rating">
-                    ⭐ {book["average_rating"]}
-                </div>
+        st.write(
+            f"⭐ {book['average_rating']:.2f}"
+        )
 
-                <div class="book-score">
-                    🔥 {int(book["ratings_count"]):,} ratings
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.caption(
+            f"🔥 {int(book['ratings_count']):,} ratings"
         )
 
 
@@ -429,77 +300,44 @@ for i, (_, book) in enumerate(
 # HOW IT WORKS
 # ==========================================
 
-st.markdown(
-    '<div class="section-title">⚙️ How It Works</div>',
-    unsafe_allow_html=True
-)
+st.divider()
 
-cols = st.columns(3)
+st.header("⚙️ How It Works")
 
-features = [
+col1, col2, col3 = st.columns(3)
 
-    (
-        "📊",
-        "Feature Extraction",
-        "Book titles, authors and original titles are converted into meaningful text features."
-    ),
-
-    (
-        "🧠",
-        "TF-IDF + Cosine Similarity",
-        "The model measures how similar books are based on their textual features."
-    ),
-
-    (
-        "✨",
-        "Top Recommendations",
-        "The system returns the books with the highest similarity scores."
+with col1:
+    st.subheader("📊 Feature Extraction")
+    st.write(
+        "Book titles, authors and original titles "
+        "are converted into text features."
     )
 
-]
+with col2:
+    st.subheader("🧠 TF-IDF")
+    st.write(
+        "TF-IDF converts book information into "
+        "numerical vectors for comparison."
+    )
 
-for i, (
-    icon,
-    title,
-    text
-) in enumerate(features):
-
-    with cols[i]:
-
-        st.markdown(
-            f"""
-            <div class="feature-card">
-
-                <div class="feature-icon">
-                    {icon}
-                </div>
-
-                <div class="feature-title">
-                    {title}
-                </div>
-
-                <div class="feature-text">
-                    {text}
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+with col3:
+    st.subheader("✨ Recommendations")
+    st.write(
+        "Cosine similarity finds books that are "
+        "most similar to your selected book."
+    )
 
 
 # ==========================================
 # TECH STACK
 # ==========================================
 
-st.markdown(
-    '<div class="section-title">🛠️ Technology Stack</div>',
-    unsafe_allow_html=True
-)
+st.divider()
+
+st.subheader("🛠️ Tech Stack")
 
 st.write(
-    "🐍 Python   •   🐼 Pandas   •   🔢 NumPy   •   "
-    "🤖 Scikit-learn   •   🎨 Streamlit"
+    "Python • Pandas • NumPy • Scikit-learn • Streamlit"
 )
 
 
@@ -507,14 +345,8 @@ st.write(
 # FOOTER
 # ==========================================
 
-st.markdown("""
-<div class="footer">
+st.divider()
 
-    Made with ❤️ and Python
-
-    <br>
-
-    The Book Nook • AI-powered book discovery
-
-</div>
-""", unsafe_allow_html=True)
+st.caption(
+    "📚 The Book Nook — AI-powered book discovery"
+)
